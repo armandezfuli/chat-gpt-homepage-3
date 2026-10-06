@@ -1,13 +1,21 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { HiOutlinePlus } from "react-icons/hi"
+
 import { FaArrowUp } from "react-icons/fa6"
-import { LuBrain, LuMic, LuCheck, LuX } from "react-icons/lu"
+
+import { LuBrain, LuMic, LuCheck, LuX, LuFileText } from "react-icons/lu"
 
 import useSpeechRecognition from "../../features/speech-to-text/useSpeechRecognition"
 
 function CentralInput() {
     const [message, setMessage] = useState("")
+
+    const [files, setFiles] = useState<File[]>([])
+
+    const [selectedImage, setSelectedImage] = useState<File | null>(null)
+
+    const fileInputRef = useRef<HTMLInputElement | null>(null)
 
     const {
         start,
@@ -45,8 +53,81 @@ function CentralInput() {
         await start()
     }
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = Array.from(event.target.files ?? [])
+
+        const remainingSlots = 5 - files.length
+
+        if (remainingSlots <= 0) {
+            event.target.value = ""
+            return
+        }
+
+        const filesToAdd = selectedFiles.slice(0, remainingSlots)
+
+        setFiles((currentFiles) => [...currentFiles, ...filesToAdd])
+
+        event.target.value = ""
+    }
+
+    const handleRemoveFile = (index: number) => {
+        setFiles((currentFiles) =>
+            currentFiles.filter((_, fileIndex) => fileIndex !== index),
+        )
+    }
+
+    const getFileExtension = (file: File) => {
+        const parts = file.name.split(".")
+
+        return parts.length > 1 ? `.${parts.pop()}` : ""
+    }
+
     return (
         <div className="flex flex-col justify-center items-center w-1/2 relative">
+            {files.length > 0 && (
+                <div className="absolute bottom-full mb-3 left-0 right-0 flex gap-2 overflow-x-auto px-1 pb-1">
+                    {files.map((file, index) => {
+                        const isImage = file.type.startsWith("image/")
+
+                        return (
+                            <div
+                                key={`${file.name}-${index}`}
+                                className="relative flex-shrink-0 w-28 h-28 overflow-hidden rounded-2xl border border-[#444] bg-[#2a2a2a] shadow-lg">
+                                {isImage ? (
+                                    <img
+                                        src={URL.createObjectURL(file)}
+                                        alt={file.name}
+                                        onClick={() => setSelectedImage(file)}
+                                        className="absolute inset-0 w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-200"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-[#292929]">
+                                        <LuFileText className="text-3xl text-slate-300" />
+
+                                        <span className="text-xs font-medium text-slate-300">
+                                            {getFileExtension(file).toUpperCase()}
+                                        </span>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile(index)}
+                                    className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-black/70 text-white hover:bg-black transition-colors z-10">
+                                    <LuX className="text-sm" />
+                                </button>
+
+                                <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
+                                    <p className="truncate text-xs text-white">
+                                        {file.name}
+                                    </p>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
             <input
                 type="text"
                 value={isRecording ? transcript : message}
@@ -57,7 +138,17 @@ function CentralInput() {
                 placeholder="Ask anything..."
             />
 
-            <span className="w-10 h-10 flex justify-center items-center hover:bg-[#444]/80 absolute left-3 top-[70%] transform -translate-y-1/2 rounded-full cursor-pointer">
+            <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={handleFileChange}
+            />
+
+            <span
+                onClick={() => fileInputRef.current?.click()}
+                className="w-10 h-10 flex justify-center items-center hover:bg-[#444]/80 absolute left-3 top-[70%] transform -translate-y-1/2 rounded-full cursor-pointer">
                 <HiOutlinePlus className="text-2xl" />
             </span>
 
@@ -92,6 +183,27 @@ function CentralInput() {
                         Think
                     </span>
                 </>
+            )}
+
+            {/* Fullscreen Image Preview */}
+            {selectedImage && (
+                <div
+                    onClick={() => setSelectedImage(null)}
+                    className="fixed inset-0 z-999 flex items-center justify-center bg-black/90 p-6 cursor-zoom-out">
+                    <button
+                        type="button"
+                        onClick={() => setSelectedImage(null)}
+                        className="absolute top-5 right-5 w-11 h-11 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
+                        <LuX className="text-2xl" />
+                    </button>
+
+                    <img
+                        src={URL.createObjectURL(selectedImage)}
+                        alt={selectedImage.name}
+                        onClick={(event) => event.stopPropagation()}
+                        className="max-w-full max-h-full object-contain rounded-lg cursor-default"
+                    />
+                </div>
             )}
         </div>
     )
